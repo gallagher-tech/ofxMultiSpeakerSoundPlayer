@@ -591,7 +591,8 @@ void ofxMultiSpeakerSoundPlayer::playTo(OUTPUT_SPEAKERS leftSpeaker, OUTPUT_SPEA
 
 	// array when input is stereo, this will define what is fed to the selected
 	// speaker
-	// float levels[2] = { 1.0f, 1.0f };
+	float leftMixLevels[2] = { inputLevel[0], 0.0f };
+	float rightMixLevels[2] = { 0.0f, inputLevel[1] };
 
 	// further reading:
 	// https://qa.fmod.com/t/setspeakerlevels-with-more-than-8-speakers/9623/14
@@ -603,12 +604,12 @@ void ofxMultiSpeakerSoundPlayer::playTo(OUTPUT_SPEAKERS leftSpeaker, OUTPUT_SPEA
 	// should support 16 speakers by using all the enums.
 	if (leftSpeaker >= 0) {
 		FMOD_Channel_SetSpeakerLevels(channel, (FMOD_SPEAKER)leftSpeaker,
-			inputLevel, 2);
+			leftMixLevels, 2);
 	}
 
 	if (rightSpeaker >= 0) {
 		FMOD_Channel_SetSpeakerLevels(channel, (FMOD_SPEAKER)rightSpeaker,
-			inputLevel, 2);
+			rightMixLevels, 2);
 	}
 
 	FMOD_Channel_SetPaused(channel, 0);

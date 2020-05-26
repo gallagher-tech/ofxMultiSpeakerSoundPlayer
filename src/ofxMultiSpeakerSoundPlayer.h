@@ -39,7 +39,7 @@ class ofxMultiSpeakerSoundPlayer : public ofBaseSoundPlayer
 {
 public:
 	// !When left empty, default audio device will be used.
-	//  select ASIO driver by using DRIVER_TYPE::ASIO
+	//  Select ASIO driver by using DRIVER_TYPE::ASIO.
 	ofxMultiSpeakerSoundPlayer(std::string deviceName = "", DRIVER_TYPE type = DRIVER_TYPE::DEFAULT);
 
 	//bool load(string fileName, bool stream = false)
@@ -48,8 +48,9 @@ public:
 	void play();
 	// !Use this for 7.1 setup. Should be working with WDM
 	virtual void playTo(int speaker);
-	// !Customize audio out speaker by index
-	//  needed when outputting to more than 8 speakers with ASIO enabled
+	// !Customize audio out to speaker by index.
+	//  Needed when outputting to more than 8 speakers with ASIO enabled.
+	//  `inputLevel` is an array (stereo when size is 2) that defines the volume mix of the audio source.
 	virtual void playTo(OUTPUT_SPEAKERS leftSpeaker = (OUTPUT_SPEAKERS)-1, OUTPUT_SPEAKERS rightSpeaker = (OUTPUT_SPEAKERS)-1, float* inputLevel = nullptr);
 	void stop();
 
