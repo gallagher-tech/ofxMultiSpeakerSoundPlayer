@@ -1,6 +1,4 @@
 # ofxMultiSpeakerSoundPlayer  
-==========================
-
 ## Working with 7.1 audio output configuration  
 8 channel audio output for openFrameworks
 
@@ -59,7 +57,7 @@ Example:
 ```
 std::string device = "Speakers (MOTU Pro Audio)";
 audioPlayer        = new ofxMultiSpeakerSoundPlayer( device, DRIVER_TYPE::ASIO );
-audioPlayerTwo     = new ofxMultiSpeakerSoundPlayer( device DRIVER_TYPE::ASIO );
+audioPlayerTwo     = new ofxMultiSpeakerSoundPlayer( device, DRIVER_TYPE::ASIO );
 
 audioPlayer->load( "1.mp3" );
 audioPlayerTwo->load( "2.mp3" );
