@@ -8,6 +8,26 @@ extern "C" {
 #include "fmod_errors.h"
 }
 
+typedef enum {
+	SPEAKER_ONE,
+	SPEAKER_TWO,
+	SPEAKER_THREE,
+	SPEAKER_FOUR,
+	SPEAKER_FIVE,
+	SPEAKER_SIX,
+	SPEAKER_SEVEN,
+	SPEAKER_EIGHT,
+	SPEAKER_NINE,
+	SPEAKER_TEN,
+	SPEAKER_ELEVEN,
+	SPEAKER_TWELVE,
+	SPEAKER_THIRTEEN,
+	SPEAKER_FOURTEEN,
+	SPEAKER_FIFTEEN,
+	SPEAKER_SIXTEEN,
+	SPEAKER_NULL = -1
+} ASIO_SPEAKERS;
+
 class ofxMultiSpeakerSoundPlayer : public ofBaseSoundPlayer
 {
 public:
@@ -19,6 +39,7 @@ public:
 	void unload();
 	void play();
 	void playTo(int speaker);
+	void playTo(ASIO_SPEAKERS leftSpeaker = (ASIO_SPEAKERS)-1, ASIO_SPEAKERS rightSpeaker = (ASIO_SPEAKERS)-1, float* inputLevel = nullptr);
 	void stop();
 
 	void setVolume(float vol);

@@ -142,21 +142,116 @@ ofxMultiSpeakerSoundPlayer::ofxMultiSpeakerSoundPlayer()
 // this should only be called once
 void ofxMultiSpeakerSoundPlayer::initializeFmod()
 {
-	FMOD_SPEAKERMODE  speakermode;
+	// fmod api
+	// https://fmod.com/resources/documentation-api?version=2.0&page=core-api-system.html
+	//https://qa.fmod.com/t/fmod-multiple-channel-audio-over-dante-asio-virtual-sound-card/11724
+	FMOD_SPEAKERMODE speakermode;
 	int numdrivers;
 
 	if (!bFmodInitialized_) {
 		FMOD_System_Create(&sys);
-		FMOD_System_SetDriver(sys, 7); // setup driver 7.1 with index 7
-		FMOD_System_SetSpeakerMode(sys, FMOD_SPEAKERMODE_7POINT1);
+
+		ofLogToConsole();
+
+		FMOD_System_GetNumDrivers(sys, &numdrivers);
+		ofLogNotice() << "number of drivers:" << numdrivers;
+
+		for (size_t i = 0; i < numdrivers; i++) {
+			char name[256];
+			FMOD_System_GetDriverInfo(sys, i, name, 256, NULL);
+			ofLogNotice() << "device index: " << i << "  device name: " << name;
+		}
+
+		int driverIndex = 1;
+
+		FMOD_System_SetDriver(sys, driverIndex);  // setup driver 7.1 with index 7
+		FMOD_RESULT      result;
+		FMOD_SPEAKERMODE speakermode;
+		FMOD_System_GetDriverCaps(sys, driverIndex, 0, 0, &speakermode);
+		ofLogNotice() << "default speakermode: " << speakermode;
+		FMOD_System_SetSpeakerMode(sys, FMOD_SPEAKERMODE_RAW);
+		//ofLogNotice() << result;
+
+		result = FMOD_System_SetOutput(sys, FMOD_OUTPUTTYPE_ASIO);
+
+		if (result != FMOD_OK) {
+			ofLogNotice() << "set asio failed";
+		}
+		else {
+			ofLogNotice() << "set asio done";
+		}
+
+
+		// asio 32 channels is not supported in our setup
+		//FMOD_System_SetSoftwareFormat(sys, 48000, FMOD_SOUND_FORMAT_PCM16, 32, 32, FMOD_DSP_RESAMPLER_LINEAR);
+		result = FMOD_System_SetSoftwareFormat(sys, 48000, FMOD_SOUND_FORMAT_PCM16, 16, 16, FMOD_DSP_RESAMPLER_LINEAR);
+
+
+		if (result != FMOD_OK) {
+			ofLogNotice() << "set software format failed";
+		}
+		else {
+			ofLogNotice() << "set software format done";
+		}
+
 
 #ifdef TARGET_LINUX
 		FMOD_System_SetOutput(sys, FMOD_OUTPUTTYPE_ALSA);
 #endif
 
-		FMOD_System_Init(sys, 32, FMOD_INIT_NORMAL, NULL); //do we want just 32 channels?
+		FMOD_System_Init(sys, 32, FMOD_INIT_NORMAL,
+			NULL);  // do we want just 32 channels?
 		FMOD_System_GetMasterChannelGroup(sys, &channelgroup);
+
 		bFmodInitialized_ = true;
+
+		FMOD_System_GetSpeakerMode(sys, &speakermode);
+		ofLogNotice() << "speakermode after init: " << speakermode;
+
+		// reference: https://qa.fmod.com/t/how-can-i-select-specific-output-channels/14716/2
+		// to set the advanced settings correctly when using asio:
+		// 1. init FMOD_ADVANCEDSETTINGS, set cbsize to sizeof(FMOD_ADVANCEDSETTINGS)
+		// 2. feed the setting to FMOD_System_GetAdvancedSettings
+		// 3. set params. in here we need ASIONumChannels and ASIOSpeakerList
+		// 4. ASIONumChannels should have same value of number of speakers desired
+		// 5. ASIOSpeakerList is an array of FMOD_SPEAKER to represent channel mappings
+
+		// init adv settings
+		FMOD_ADVANCEDSETTINGS advSettings = { 0 };
+		advSettings.cbsize = sizeof(FMOD_ADVANCEDSETTINGS); // critical init 
+
+		result = FMOD_System_GetAdvancedSettings(sys, &advSettings);
+
+		if (result != FMOD_OK) {
+			ofLogNotice() << "get advanced settings failed";
+		}
+		else {
+			ofLogNotice() << "get advanced settings done";
+		}
+
+		// designed number of channels and speakers
+		advSettings.ASIONumChannels = 16;
+
+		int* speakerlist = new int[advSettings.ASIONumChannels];
+
+		for (int speaker = 0; speaker < advSettings.ASIONumChannels; speaker++)
+		{
+			speakerlist[speaker] = speaker /*+ (speaker >= FMOD_SPEAKER_MAX ? 1 : 0)*/;
+		}
+		advSettings.ASIOSpeakerList = (FMOD_SPEAKER*)speakerlist;
+
+		result = FMOD_System_SetAdvancedSettings(sys, &advSettings);
+
+		if (result != FMOD_OK) {
+			ofLogNotice() << "set advanced settings failed";
+		}
+		else {
+			ofLogNotice() << "set advanced settings done";
+		}
+
+		int numChannels;
+		FMOD_System_GetSoftwareChannels(sys, &numChannels);
+		ofLogNotice() << "num of software channels: " << numChannels;
 	}
 }
 
@@ -461,6 +556,58 @@ void ofxMultiSpeakerSoundPlayer::playTo(int speaker)
 	//we have been using fmod without calling it at all which resulted in channels not being able
 	//to be reused.  we should have some sort of global update function but putting it here
 	//solves the channel bug
+	FMOD_System_Update(sys);
+}
+
+void ofxMultiSpeakerSoundPlayer::playTo(ASIO_SPEAKERS leftSpeaker, ASIO_SPEAKERS rightSpeaker, float* inputLevel) {
+	// if it's a looping sound, we should try to kill it, no?
+	// or else people will have orphan channels that are looping
+	if (bLoop == true) {
+		FMOD_Channel_Stop(channel);
+	}
+
+	// if the sound is not set to multiplay, then stop the current,
+	// before we start another
+	if (!bMultiPlay) {
+		FMOD_Channel_Stop(channel);
+	}
+
+	FMOD_System_PlaySound(sys, FMOD_CHANNEL_FREE, sound, 1, &channel);
+
+	// array when input is stereo, this will define what is fed to the selected
+	// speaker
+	// float levels[2] = { 1.0f, 1.0f };
+
+	// further reading:
+	// https://qa.fmod.com/t/setspeakerlevels-with-more-than-8-speakers/9623/14
+	// not sure if supporting all 16 speakers, some mentioned 15
+	// manipulating input level and output level:
+	// https://github.com/kengonakajima/moyai/blob/master/fmod/examples/multispeakeroutput/main.c
+
+	// casting enum to FMOD_SPEAKER, should support 16 speakers by using all the
+	// enums.
+	if (leftSpeaker >= 0) {
+		FMOD_Channel_SetSpeakerLevels(channel, (FMOD_SPEAKER)leftSpeaker,
+			inputLevel, 2);
+	}
+
+	if (rightSpeaker >= 0) {
+		FMOD_Channel_SetSpeakerLevels(channel, (FMOD_SPEAKER)rightSpeaker,
+			inputLevel, 2);
+	}
+
+	FMOD_Channel_SetPaused(channel, 0);
+
+	FMOD_Channel_GetFrequency(channel, &internalFreq);
+	FMOD_Channel_SetVolume(channel, volume);
+	FMOD_Channel_SetFrequency(channel, internalFreq * speed);
+	FMOD_Channel_SetMode(channel,
+		(bLoop == true) ? FMOD_LOOP_NORMAL : FMOD_LOOP_OFF);
+
+	// fmod update() should be called every frame - according to the docs.
+	// we have been using fmod without calling it at all which resulted in
+	// channels not being able to be reused.  we should have some sort of global
+	// update function but putting it here solves the channel bug
 	FMOD_System_Update(sys);
 }
 
