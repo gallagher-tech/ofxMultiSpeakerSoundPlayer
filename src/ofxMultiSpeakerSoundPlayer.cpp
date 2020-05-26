@@ -10,6 +10,9 @@ float fftSpectrum_[8192];		// maximum #ofxMultiSpeakerSoundPlayer is 8192, in fm
 // ---------------------  static vars
 static FMOD_CHANNELGROUP* channelgroup;
 static FMOD_SYSTEM* sys;
+static bool g_isASIO;
+static std::string g_deviceName;
+static int g_asioNumChannels = 16;
 
 // these are global functions, that affect every sound / channel:
 // ------------------------------------------------------------
@@ -243,7 +246,7 @@ void ofxMultiSpeakerSoundPlayer::initializeFmod()
 			}
 
 			// designed number of channels and speakers
-			advSettings.ASIONumChannels = 16;
+			advSettings.ASIONumChannels = g_asioNumChannels;
 
 			int* speakerlist = new int[advSettings.ASIONumChannels];
 

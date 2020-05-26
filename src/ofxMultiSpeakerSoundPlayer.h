@@ -32,8 +32,6 @@ static const enum class DRIVER_TYPE {
 	DEFAULT,
 	ASIO
 };
-static bool g_isASIO;
-static std::string g_deviceName;
 
 class ofxMultiSpeakerSoundPlayer : public ofBaseSoundPlayer
 {
