@@ -126,8 +126,17 @@ float* fmodSoundGetSpectrum(int nBands)
 
 // now, the individual sound player:
 //------------------------------------------------------------
-ofxMultiSpeakerSoundPlayer::ofxMultiSpeakerSoundPlayer()
+ofxMultiSpeakerSoundPlayer::ofxMultiSpeakerSoundPlayer(std::string deviceName, DRIVER_TYPE type)
 {
+	g_deviceName = deviceName;
+	if (type == DRIVER_TYPE::ASIO)
+	{
+		g_isASIO = true;
+	}
+	else {
+		g_isASIO = false;
+	}
+
 	bLoop = false;
 	bLoadedOk = false;
 	pan = 0.0f; // range for oF is -1 to 1
@@ -156,44 +165,47 @@ void ofxMultiSpeakerSoundPlayer::initializeFmod()
 		FMOD_System_GetNumDrivers(sys, &numdrivers);
 		ofLogNotice() << "number of drivers:" << numdrivers;
 
+		int driverIndex = 0;
+
 		for (size_t i = 0; i < numdrivers; i++) {
 			char name[256];
 			FMOD_System_GetDriverInfo(sys, i, name, 256, NULL);
 			ofLogNotice() << "device index: " << i << "  device name: " << name;
+			if (g_deviceName == name) {
+				driverIndex = i;
+			}
 		}
-
-		int driverIndex = 1;
 
 		FMOD_System_SetDriver(sys, driverIndex);  // setup driver 7.1 with index 7
 		FMOD_RESULT      result;
 		FMOD_SPEAKERMODE speakermode;
 		FMOD_System_GetDriverCaps(sys, driverIndex, 0, 0, &speakermode);
 		ofLogNotice() << "default speakermode: " << speakermode;
-		FMOD_System_SetSpeakerMode(sys, FMOD_SPEAKERMODE_RAW);
-		//ofLogNotice() << result;
 
-		result = FMOD_System_SetOutput(sys, FMOD_OUTPUTTYPE_ASIO);
-
-		if (result != FMOD_OK) {
-			ofLogNotice() << "set asio failed";
+		if (!g_isASIO) {
+			FMOD_System_SetSpeakerMode(sys, FMOD_SPEAKERMODE_RAW);
 		}
 		else {
-			ofLogNotice() << "set asio done";
+			FMOD_System_SetSpeakerMode(sys, FMOD_SPEAKERMODE_RAW);
+			result = FMOD_System_SetOutput(sys, FMOD_OUTPUTTYPE_ASIO);
+			if (result != FMOD_OK) {
+				ofLogNotice() << "set asio failed";
+			}
+			else {
+				ofLogNotice() << "set asio done";
+			}
+			// asio 32 channels is not supported in our setup
+//FMOD_System_SetSoftwareFormat(sys, 48000, FMOD_SOUND_FORMAT_PCM16, 32, 32, FMOD_DSP_RESAMPLER_LINEAR);
+			result = FMOD_System_SetSoftwareFormat(sys, 48000, FMOD_SOUND_FORMAT_PCM16, 16, 16, FMOD_DSP_RESAMPLER_LINEAR);
+
+
+			if (result != FMOD_OK) {
+				ofLogNotice() << "set software format failed";
+			}
+			else {
+				ofLogNotice() << "set software format done";
+			}
 		}
-
-
-		// asio 32 channels is not supported in our setup
-		//FMOD_System_SetSoftwareFormat(sys, 48000, FMOD_SOUND_FORMAT_PCM16, 32, 32, FMOD_DSP_RESAMPLER_LINEAR);
-		result = FMOD_System_SetSoftwareFormat(sys, 48000, FMOD_SOUND_FORMAT_PCM16, 16, 16, FMOD_DSP_RESAMPLER_LINEAR);
-
-
-		if (result != FMOD_OK) {
-			ofLogNotice() << "set software format failed";
-		}
-		else {
-			ofLogNotice() << "set software format done";
-		}
-
 
 #ifdef TARGET_LINUX
 		FMOD_System_SetOutput(sys, FMOD_OUTPUTTYPE_ALSA);
@@ -205,53 +217,56 @@ void ofxMultiSpeakerSoundPlayer::initializeFmod()
 
 		bFmodInitialized_ = true;
 
-		FMOD_System_GetSpeakerMode(sys, &speakermode);
-		ofLogNotice() << "speakermode after init: " << speakermode;
+		if (g_isASIO) {
+			FMOD_System_GetSpeakerMode(sys, &speakermode);
+			ofLogNotice() << "speakermode after init: " << speakermode;
 
-		// reference: https://qa.fmod.com/t/how-can-i-select-specific-output-channels/14716/2
-		// to set the advanced settings correctly when using asio:
-		// 1. init FMOD_ADVANCEDSETTINGS, set cbsize to sizeof(FMOD_ADVANCEDSETTINGS)
-		// 2. feed the setting to FMOD_System_GetAdvancedSettings
-		// 3. set params. in here we need ASIONumChannels and ASIOSpeakerList
-		// 4. ASIONumChannels should have same value of number of speakers desired
-		// 5. ASIOSpeakerList is an array of FMOD_SPEAKER to represent channel mappings
+			// reference: https://qa.fmod.com/t/how-can-i-select-specific-output-channels/14716/2
+			// to set the advanced settings correctly when using asio:
+			// 1. init FMOD_ADVANCEDSETTINGS, set cbsize to sizeof(FMOD_ADVANCEDSETTINGS)
+			// 2. feed the setting to FMOD_System_GetAdvancedSettings
+			// 3. set params. in here we need ASIONumChannels and ASIOSpeakerList
+			// 4. ASIONumChannels should have same value of number of speakers desired
+			// 5. ASIOSpeakerList is an array of FMOD_SPEAKER to represent channel mappings
 
-		// init adv settings
-		FMOD_ADVANCEDSETTINGS advSettings = { 0 };
-		advSettings.cbsize = sizeof(FMOD_ADVANCEDSETTINGS); // critical init 
+			// init adv settings
+			FMOD_ADVANCEDSETTINGS advSettings = { 0 };
+			advSettings.cbsize = sizeof(FMOD_ADVANCEDSETTINGS); // critical init 
 
-		result = FMOD_System_GetAdvancedSettings(sys, &advSettings);
+			result = FMOD_System_GetAdvancedSettings(sys, &advSettings);
 
-		if (result != FMOD_OK) {
-			ofLogNotice() << "get advanced settings failed";
+			if (result != FMOD_OK) {
+				ofLogNotice() << "get advanced settings failed";
+			}
+			else {
+				ofLogNotice() << "get advanced settings done";
+			}
+
+			// designed number of channels and speakers
+			advSettings.ASIONumChannels = 16;
+
+			int* speakerlist = new int[advSettings.ASIONumChannels];
+
+			for (int speaker = 0; speaker < advSettings.ASIONumChannels; speaker++)
+			{
+				speakerlist[speaker] = speaker /*+ (speaker >= FMOD_SPEAKER_MAX ? 1 : 0)*/;
+			}
+			advSettings.ASIOSpeakerList = (FMOD_SPEAKER*)speakerlist;
+
+			result = FMOD_System_SetAdvancedSettings(sys, &advSettings);
+
+			if (result != FMOD_OK) {
+				ofLogNotice() << "set advanced settings failed";
+			}
+			else {
+				ofLogNotice() << "set advanced settings done";
+			}
+
+			//int numChannels;
+			//FMOD_System_GetSoftwareChannels(sys, &numChannels);
+			//ofLogNotice() << "num of software channels: " << numChannels;
 		}
-		else {
-			ofLogNotice() << "get advanced settings done";
-		}
 
-		// designed number of channels and speakers
-		advSettings.ASIONumChannels = 16;
-
-		int* speakerlist = new int[advSettings.ASIONumChannels];
-
-		for (int speaker = 0; speaker < advSettings.ASIONumChannels; speaker++)
-		{
-			speakerlist[speaker] = speaker /*+ (speaker >= FMOD_SPEAKER_MAX ? 1 : 0)*/;
-		}
-		advSettings.ASIOSpeakerList = (FMOD_SPEAKER*)speakerlist;
-
-		result = FMOD_System_SetAdvancedSettings(sys, &advSettings);
-
-		if (result != FMOD_OK) {
-			ofLogNotice() << "set advanced settings failed";
-		}
-		else {
-			ofLogNotice() << "set advanced settings done";
-		}
-
-		int numChannels;
-		FMOD_System_GetSoftwareChannels(sys, &numChannels);
-		ofLogNotice() << "num of software channels: " << numChannels;
 	}
 }
 
@@ -559,7 +574,7 @@ void ofxMultiSpeakerSoundPlayer::playTo(int speaker)
 	FMOD_System_Update(sys);
 }
 
-void ofxMultiSpeakerSoundPlayer::playTo(ASIO_SPEAKERS leftSpeaker, ASIO_SPEAKERS rightSpeaker, float* inputLevel) {
+void ofxMultiSpeakerSoundPlayer::playTo(OUTPUT_SPEAKERS leftSpeaker, OUTPUT_SPEAKERS rightSpeaker, float* inputLevel) {
 	// if it's a looping sound, we should try to kill it, no?
 	// or else people will have orphan channels that are looping
 	if (bLoop == true) {
@@ -584,8 +599,8 @@ void ofxMultiSpeakerSoundPlayer::playTo(ASIO_SPEAKERS leftSpeaker, ASIO_SPEAKERS
 	// manipulating input level and output level:
 	// https://github.com/kengonakajima/moyai/blob/master/fmod/examples/multispeakeroutput/main.c
 
-	// casting enum to FMOD_SPEAKER, should support 16 speakers by using all the
-	// enums.
+	// casting enum to FMOD_SPEAKER,
+	// should support 16 speakers by using all the enums.
 	if (leftSpeaker >= 0) {
 		FMOD_Channel_SetSpeakerLevels(channel, (FMOD_SPEAKER)leftSpeaker,
 			inputLevel, 2);

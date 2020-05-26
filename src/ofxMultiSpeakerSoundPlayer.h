@@ -26,22 +26,31 @@ typedef enum {
 	SPEAKER_FIFTEEN,
 	SPEAKER_SIXTEEN,
 	SPEAKER_NULL = -1
-} ASIO_SPEAKERS;
+} OUTPUT_SPEAKERS;
+
+static const enum class DRIVER_TYPE {
+	DEFAULT,
+	ASIO
+};
+static bool g_isASIO;
+static std::string g_deviceName;
 
 class ofxMultiSpeakerSoundPlayer : public ofBaseSoundPlayer
 {
 public:
-
-	ofxMultiSpeakerSoundPlayer();
+	// !When left empty, default audio device will be used.
+	//  select ASIO driver by using DRIVER_TYPE::ASIO
+	ofxMultiSpeakerSoundPlayer(std::string deviceName = "", DRIVER_TYPE type = DRIVER_TYPE::DEFAULT);
 
 	//bool load(string fileName, bool stream = false)
 	virtual bool load(const std::filesystem::path& fileName, bool stream = false);
 	void unload();
 	void play();
 	// !Use this for 7.1 setup. Should be working with WDM
-	void playTo(int speaker);
-	// !ASIO implementation to make use of all availble audio out
-	void playTo(ASIO_SPEAKERS leftSpeaker = (ASIO_SPEAKERS)-1, ASIO_SPEAKERS rightSpeaker = (ASIO_SPEAKERS)-1, float* inputLevel = nullptr);
+	virtual void playTo(int speaker);
+	// !Customize audio out speaker by index
+	//  needed when outputting to more than 8 speakers with ASIO enabled
+	virtual void playTo(OUTPUT_SPEAKERS leftSpeaker = (OUTPUT_SPEAKERS)-1, OUTPUT_SPEAKERS rightSpeaker = (OUTPUT_SPEAKERS)-1, float* inputLevel = nullptr);
 	void stop();
 
 	void setVolume(float vol);
