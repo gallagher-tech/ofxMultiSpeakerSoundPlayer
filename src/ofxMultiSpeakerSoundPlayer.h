@@ -38,7 +38,9 @@ public:
 	virtual bool load(const std::filesystem::path& fileName, bool stream = false);
 	void unload();
 	void play();
+	// !Use this for 7.1 setup. Should be working with WDM
 	void playTo(int speaker);
+	// !ASIO implementation to make use of all availble audio out
 	void playTo(ASIO_SPEAKERS leftSpeaker = (ASIO_SPEAKERS)-1, ASIO_SPEAKERS rightSpeaker = (ASIO_SPEAKERS)-1, float* inputLevel = nullptr);
 	void stop();
 
@@ -62,6 +64,7 @@ public:
 	static void initializeFmod();
 	static void closeFmod();
 
+private:
 	bool isStreaming;
 	bool bMultiPlay;
 	bool bLoop;
