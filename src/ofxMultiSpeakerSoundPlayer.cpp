@@ -607,7 +607,7 @@ void ofxMultiSpeakerSoundPlayer::waitForSoundAndPlay()
 
 			FMOD_OPENSTATE state;
 			result = FMOD_Sound_GetOpenState(sound, &state, nullptr, nullptr, nullptr);
-			if (state == FMOD_OPENSTATE_READY) {
+			if (state == FMOD_OPENSTATE_READY && result == FMOD_OK) {
 				ofLogNotice() << "sound loaded";
 				m_isCheckingSoundAvailability = false;
 
